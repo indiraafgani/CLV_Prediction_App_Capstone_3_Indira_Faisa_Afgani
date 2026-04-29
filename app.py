@@ -104,224 +104,174 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ─── FEVER Color Palette CSS ─────────────────────────────────────────────────
+# ─── Color Palette CSS ─────────────────────────────────────────────────
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
     html, body, [class*="css"] {
-        font-family: 'DM Sans', sans-serif;
-        color: #FCF5AF;
+        font-family: 'Inter', sans-serif;
+        color: #222338;
     }
+
     .stApp {
-        background: #060608;
+        background: #e1e1e1;
     }
+
     #MainMenu, footer, header { visibility: hidden; }
 
+    /* HERO */
     .hero {
-        background: linear-gradient(135deg, #0a0a0f 0%, #0B1A2E 60%, #1a0a00 100%);
-        border: 1px solid rgba(228,79,10,0.3);
+        background: linear-gradient(135deg, #ffffff 0%, #f3f3f3 100%);
+        border: 1px solid rgba(34,35,56,0.1);
         border-radius: 20px;
         padding: 2.5rem 3rem;
         margin-bottom: 2rem;
-        position: relative;
-        overflow: hidden;
-    }
-    .hero::before {
-        content: '';
-        position: absolute;
-        top: -80px; right: -80px;
-        width: 280px; height: 280px;
-        background: radial-gradient(circle, rgba(228,79,10,0.18) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-    .hero::after {
-        content: '';
-        position: absolute;
-        bottom: -60px; left: -60px;
-        width: 200px; height: 200px;
-        background: radial-gradient(circle, rgba(11,75,139,0.2) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-    .hero-title {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 3rem;
-        letter-spacing: 0.08em;
-        background: linear-gradient(90deg, #F0A533, #E44F0A, #BA011A);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0 0 0.4rem 0;
-        line-height: 1;
-    }
-    .hero-sub {
-        font-size: 0.95rem;
-        color: #a89060;
-        margin: 0;
-        font-weight: 400;
     }
 
+    .hero-title {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 2.8rem;
+        letter-spacing: 0.05em;
+        color: #0a66b7;
+        margin-bottom: 0.3rem;
+    }
+
+    .hero-sub {
+        font-size: 0.95rem;
+        color: #555;
+    }
+
+    /* CARD */
     .section-card {
-        background: #0D0D12;
-        border: 1px solid rgba(228,79,10,0.15);
+        background: #ffffff;
+        border: 1px solid rgba(34,35,56,0.1);
         border-radius: 16px;
         padding: 1.8rem 2rem;
         margin-bottom: 1.5rem;
     }
+
     .section-title {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 1rem;
-        letter-spacing: 0.2em;
-        color: #F0A533;
+        letter-spacing: 0.15em;
+        color: #0a66b7;
         margin-bottom: 1.2rem;
     }
 
-    label, .stSelectbox label, .stNumberInput label,
-    .stTextInput label, [data-testid="stWidgetLabel"] {
-        color: #c8a870 !important;
-        font-size: 0.87rem !important;
+    /* INPUT */
+    label {
+        color: #222338 !important;
+        font-size: 0.85rem !important;
         font-weight: 500 !important;
     }
+
     .stSelectbox > div > div,
     .stNumberInput > div > div > input,
     .stTextInput > div > div > input {
-        background: #13100a !important;
-        border: 1px solid rgba(240,165,51,0.25) !important;
+        background: #ffffff !important;
+        border: 1px solid #ccc !important;
         border-radius: 10px !important;
-        color: #FCF5AF !important;
-        font-family: 'DM Sans', sans-serif !important;
+        color: #222338 !important;
     }
+
     .stSelectbox > div > div:focus-within,
     .stNumberInput > div > div > input:focus,
     .stTextInput > div > div > input:focus {
-        border-color: #E44F0A !important;
-        box-shadow: 0 0 0 2px rgba(228,79,10,0.2) !important;
+        border-color: #0a66b7 !important;
+        box-shadow: 0 0 0 2px rgba(10,102,183,0.15) !important;
     }
-    [data-baseweb="select"] ul li {
-        background: #13100a !important;
-        color: #FCF5AF !important;
-    }
-    [data-baseweb="popover"] { background: #13100a !important; }
 
+    /* BUTTON */
     .stButton > button {
         width: 100%;
-        background: linear-gradient(135deg, #BA011A, #E44F0A);
-        color: #FCF5AF;
-        border: none;
-        border-radius: 12px;
-        padding: 0.85rem 2rem;
-        font-size: 1.1rem;
-        font-weight: 700;
-        font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 0.12em;
-        cursor: pointer;
-        transition: all 0.25s ease;
-        margin-top: 0.5rem;
+        background: #0a66b7;
+        color: white;
+        border-radius: 10px;
+        padding: 0.75rem;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: 0.2s;
     }
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #E44F0A, #F0A533);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 28px rgba(228,79,10,0.35);
-        color: #000000;
-    }
-    .stButton > button:active { transform: translateY(0); }
 
+    .stButton > button:hover {
+        background: #084c87;
+        transform: translateY(-1px);
+    }
+
+    /* RESULT */
     .result-card {
+        background: #ffffff;
+        border: 1px solid rgba(34,35,56,0.1);
         border-radius: 16px;
         padding: 2rem;
         text-align: center;
-        margin-bottom: 1rem;
     }
-    .clv-card {
-        background: linear-gradient(135deg, #0B1A2E, #0e2040);
-        border: 1px solid rgba(11,75,139,0.5);
-    }
+
     .clv-label {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 0.9rem;
-        letter-spacing: 0.2em;
-        color: #5B9BD5;
-        margin-bottom: 0.4rem;
+        font-size: 0.8rem;
+        color: #666;
     }
+
     .clv-customer {
-        font-size: 0.88rem;
-        color: #F0A533;
-        margin-bottom: 0.4rem;
+        font-size: 0.9rem;
+        color: #0a66b7;
         font-weight: 600;
     }
+
     .clv-value {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: 700;
         font-family: 'DM Mono', monospace;
-        color: #FCF5AF;
-        line-height: 1;
-    }
-    .clv-note {
-        font-size: 0.76rem;
-        color: #7aaac8;
-        margin-top: 0.5rem;
+        color: #222338;
     }
 
-    .segment-card { border-radius: 16px; padding: 1.8rem; text-align: center; }
-    .seg-label {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 0.9rem;
-        letter-spacing: 0.2em;
-        margin-bottom: 0.5rem;
+    /* SEGMENTS */
+    .segment-card {
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
     }
+
     .seg-name {
         font-family: 'Bebas Neue', sans-serif;
-        font-size: 2.5rem;
-        letter-spacing: 0.1em;
-        line-height: 1;
+        font-size: 2.2rem;
     }
-    .seg-desc { font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.75; }
 
-    .seg-platinum {
-        background: linear-gradient(135deg, #0B1A2E, #122040);
-        border: 1px solid rgba(91,155,213,0.4);
+    .seg-label {
+        font-size: 0.8rem;
+        color: #666;
     }
-    .seg-platinum .seg-label { color: #5B9BD5; }
-    .seg-platinum .seg-name  { color: #FCF5AF; }
 
-    .seg-gold {
-        background: linear-gradient(135deg, #1a1000, #271800);
-        border: 1px solid rgba(240,165,51,0.4);
+    .seg-desc {
+        font-size: 0.8rem;
+        color: #777;
     }
-    .seg-gold .seg-label { color: #F0A533; }
-    .seg-gold .seg-name  { color: #FCF5AF; }
 
-    .seg-silver {
-        background: linear-gradient(135deg, #080e18, #0e1a28);
-        border: 1px solid rgba(91,155,213,0.25);
-    }
-    .seg-silver .seg-label { color: #7aaac8; }
-    .seg-silver .seg-name  { color: #c8dce8; }
+    .seg-platinum { background:#eef5fb; border:1px solid #0a66b7; }
+    .seg-gold     { background:#f7f3e8; border:1px solid #c9a227; }
+    .seg-silver   { background:#f0f2f5; border:1px solid #999; }
+    .seg-bronze   { background:#f9eee8; border:1px solid #cd7f32; }
 
-    .seg-bronze {
-        background: linear-gradient(135deg, #1a0500, #220800);
-        border: 1px solid rgba(228,79,10,0.35);
-    }
-    .seg-bronze .seg-label { color: #E44F0A; }
-    .seg-bronze .seg-name  { color: #F0A533; }
-
+    /* PILLS */
     .info-pill {
-        display: inline-block;
-        background: rgba(228,79,10,0.08);
-        border: 1px solid rgba(228,79,10,0.2);
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+        color: #333;
         border-radius: 999px;
-        padding: 0.25rem 0.85rem;
-        font-size: 0.78rem;
-        color: #E44F0A;
-        margin: 0.25rem 0.2rem;
+        padding: 0.25rem 0.8rem;
+        font-size: 0.75rem;
     }
-    hr { border-color: rgba(228,79,10,0.1); }
-    .stAlert { border-radius: 12px; }
+
+    hr {
+        border-color: rgba(0,0,0,0.1);
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # ─── Load model ───────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
