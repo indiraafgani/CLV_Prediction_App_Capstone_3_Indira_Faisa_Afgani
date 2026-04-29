@@ -1,0 +1,503 @@
+"""
+app.py – Customer Lifetime Value Prediction App
+Run: streamlit run app.py
+"""
+
+import streamlit as st
+import joblib
+import os
+from preprocessing import preprocess_input, predict_clv
+
+# ─── Page config ─────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="CLV Predictor",
+    page_icon="💎",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# ─── Custom CSS (dark, modern, high-contrast) ─────────────────────────────────
+st.markdown(
+    """
+    <style>
+    /* ── Import Fonts ── */
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+    /* ── Global Reset ── */
+    html, body, [class*="css"] {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #E8EAF0;
+    }
+    .stApp {
+        background: #0B0E1A;
+    }
+
+    /* ── Hide Streamlit chrome ── */
+    #MainMenu, footer, header { visibility: hidden; }
+
+    /* ── Hero Banner ── */
+    .hero {
+        background: linear-gradient(135deg, #0F1629 0%, #131B35 50%, #0F1629 100%);
+        border: 1px solid rgba(99,179,237,0.15);
+        border-radius: 20px;
+        padding: 2.5rem 3rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .hero::before {
+        content: '';
+        position: absolute;
+        top: -60px; right: -60px;
+        width: 220px; height: 220px;
+        background: radial-gradient(circle, rgba(99,179,237,0.12) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+    .hero-title {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #63B3ED, #9F7AEA);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0 0 0.5rem 0;
+    }
+    .hero-sub {
+        font-size: 1.0rem;
+        color: #8892A4;
+        margin: 0;
+        font-weight: 400;
+    }
+
+    /* ── Section Cards ── */
+    .section-card {
+        background: #111827;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 1.8rem 2rem;
+        margin-bottom: 1.5rem;
+    }
+    .section-title {
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: #63B3ED;
+        margin-bottom: 1.2rem;
+    }
+
+    /* ── Labels & inputs ── */
+    label, .stSelectbox label, .stNumberInput label,
+    .stSlider label, [data-testid="stWidgetLabel"] {
+        color: #C5CDD8 !important;
+        font-size: 0.87rem !important;
+        font-weight: 500 !important;
+    }
+    .stSelectbox > div > div,
+    .stNumberInput > div > div > input {
+        background: #1A2035 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 10px !important;
+        color: #E8EAF0 !important;
+        font-family: 'Space Grotesk', sans-serif !important;
+    }
+    .stSelectbox > div > div:focus-within,
+    .stNumberInput > div > div > input:focus {
+        border-color: #63B3ED !important;
+        box-shadow: 0 0 0 2px rgba(99,179,237,0.2) !important;
+    }
+    /* Dropdown items */
+    [data-baseweb="select"] ul li {
+        background: #1A2035 !important;
+        color: #E8EAF0 !important;
+    }
+    [data-baseweb="popover"] {
+        background: #1A2035 !important;
+    }
+
+    /* ── Predict Button ── */
+    .stButton > button {
+        width: 100%;
+        background: linear-gradient(135deg, #2B6CB0, #553C9A);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 12px;
+        padding: 0.85rem 2rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+        font-family: 'Space Grotesk', sans-serif;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        letter-spacing: 0.03em;
+        margin-top: 0.5rem;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #3182CE, #6B46C1);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(99,179,237,0.25);
+    }
+    .stButton > button:active { transform: translateY(0); }
+
+    /* ── Result Cards ── */
+    .result-card {
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .clv-card {
+        background: linear-gradient(135deg, #0D2137, #162B45);
+        border: 1px solid rgba(99,179,237,0.3);
+    }
+    .clv-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: #63B3ED;
+        margin-bottom: 0.6rem;
+    }
+    .clv-value {
+        font-size: 2.8rem;
+        font-weight: 700;
+        font-family: 'DM Mono', monospace;
+        color: #E8EAF0;
+        line-height: 1;
+    }
+    .clv-note {
+        font-size: 0.78rem;
+        color: #5A6475;
+        margin-top: 0.5rem;
+    }
+
+    /* ── Segment Badge ── */
+    .segment-card {
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+    }
+    .seg-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+    }
+    .seg-name {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .seg-desc {
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+        opacity: 0.7;
+    }
+
+    /* Segment colours */
+    .seg-platinum {
+        background: linear-gradient(135deg, #1A1A2E, #252540);
+        border: 1px solid rgba(200,200,230,0.35);
+    }
+    .seg-platinum .seg-label { color: #C8C8E6; }
+    .seg-platinum .seg-name  { color: #E8E8FF; }
+
+    .seg-gold {
+        background: linear-gradient(135deg, #2D2000, #3D2C00);
+        border: 1px solid rgba(255,213,0,0.35);
+    }
+    .seg-gold .seg-label { color: #FFD500; }
+    .seg-gold .seg-name  { color: #FFE566; }
+
+    .seg-silver {
+        background: linear-gradient(135deg, #1C1C22, #27272F);
+        border: 1px solid rgba(170,180,200,0.35);
+    }
+    .seg-silver .seg-label { color: #AAB4C8; }
+    .seg-silver .seg-name  { color: #C8D0DC; }
+
+    .seg-bronze {
+        background: linear-gradient(135deg, #2A1200, #361800);
+        border: 1px solid rgba(205,127,50,0.35);
+    }
+    .seg-bronze .seg-label { color: #CD7F32; }
+    .seg-bronze .seg-name  { color: #E8A060; }
+
+    /* ── Info pills ── */
+    .info-pill {
+        display: inline-block;
+        background: rgba(99,179,237,0.08);
+        border: 1px solid rgba(99,179,237,0.2);
+        border-radius: 999px;
+        padding: 0.25rem 0.85rem;
+        font-size: 0.78rem;
+        color: #63B3ED;
+        margin: 0.25rem 0.2rem;
+    }
+
+    /* ── Divider ── */
+    hr { border-color: rgba(255,255,255,0.06); }
+
+    /* ── Error box ── */
+    .stAlert { border-radius: 12px; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ─── Load model artifact ─────────────────────────────────────────────────────
+@st.cache_resource(show_spinner=False)
+def load_artifact(path: str = "model.pkl"):
+    if not os.path.exists(path):
+        return None
+    return joblib.load(path)
+
+
+artifact = load_artifact()
+
+# ─── Hero ────────────────────────────────────────────────────────────────────
+st.markdown(
+    """
+    <div class="hero">
+        <p class="hero-title">💎 Customer Lifetime Value Predictor</p>
+        <p class="hero-sub">
+            Enter customer details below to predict their estimated lifetime value
+            and automatically classify them into a revenue segment.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+if artifact is None:
+    st.error(
+        "⚠️  **model.pkl not found.** "
+        "Please run `python train_and_save_model.py` first to generate the model file.",
+        icon="🚨",
+    )
+    st.stop()
+
+# ─── Constants from artifact ─────────────────────────────────────────────────
+VEHICLE_OPTIONS  = artifact["vehicle_order"]
+COVERAGE_OPTIONS = artifact["coverage_order"]
+
+# ─── Layout: Input | Results ─────────────────────────────────────────────────
+col_input, col_result = st.columns([1.1, 0.9], gap="large")
+
+with col_input:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">📋 Customer Features</p>', unsafe_allow_html=True)
+
+    # Row 1
+    r1a, r1b = st.columns(2)
+    with r1a:
+        number_of_policies = st.number_input(
+            "Number of Policies",
+            min_value=1,
+            max_value=9,
+            value=2,
+            step=1,
+            help="Total number of insurance policies held by the customer (1–9).",
+        )
+    with r1b:
+        monthly_premium_auto = st.number_input(
+            "Monthly Premium Auto ($)",
+            min_value=61.0,
+            max_value=298.0,
+            value=100.0,
+            step=1.0,
+            format="%.2f",
+            help="Monthly auto insurance premium in USD.",
+        )
+
+    # Row 2
+    r2a, r2b = st.columns(2)
+    with r2a:
+        vehicle_class = st.selectbox(
+            "Vehicle Class",
+            options=VEHICLE_OPTIONS,
+            index=1,
+            help="Type of vehicle insured.",
+        )
+    with r2b:
+        coverage = st.selectbox(
+            "Coverage Level",
+            options=COVERAGE_OPTIONS,
+            index=0,
+            help="Insurance coverage tier.",
+        )
+
+    # Row 3 (full-width)
+    total_claim_amount = st.number_input(
+        "Total Claim Amount ($)",
+        min_value=0.0,
+        max_value=2894.0,
+        value=400.0,
+        step=1.0,
+        format="%.2f",
+        help="Total dollar amount of claims filed by the customer.",
+    )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Feature tags
+    st.markdown(
+        """
+        <div style="margin-top:-0.5rem; margin-bottom:1rem;">
+            <span class="info-pill">🧠 Gradient Boosting</span>
+            <span class="info-pill">📐 RobustScaler</span>
+            <span class="info-pill">🔢 Log-Target</span>
+            <span class="info-pill">✂️ IQR Capping</span>
+            <span class="info-pill">R² ≈ 0.90</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    predict_clicked = st.button("⚡ Predict CLV & Segment", use_container_width=True)
+
+
+# ─── Results pane ─────────────────────────────────────────────────────────────
+with col_result:
+    st.markdown('<div class="section-card" style="height:100%">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">📊 Prediction Result</p>', unsafe_allow_html=True)
+
+    SEGMENT_META = {
+        "Platinum": {
+            "css": "seg-platinum",
+            "icon": "🏆",
+            "range": "> $20,000",
+            "desc": "Top-tier, highest-value customer",
+        },
+        "Gold": {
+            "css": "seg-gold",
+            "icon": "🥇",
+            "range": "$10,000 – $20,000",
+            "desc": "High-value, strong retention priority",
+        },
+        "Silver": {
+            "css": "seg-silver",
+            "icon": "🥈",
+            "range": "$5,000 – $10,000",
+            "desc": "Mid-tier, growth opportunity",
+        },
+        "Bronze": {
+            "css": "seg-bronze",
+            "icon": "🥉",
+            "range": "< $5,000",
+            "desc": "Entry-level, cost-conscious segment",
+        },
+    }
+
+    if predict_clicked:
+        # ── Validation ─────────────────────────────────────────────────────
+        errors = []
+        if number_of_policies < 1:
+            errors.append("Number of Policies must be ≥ 1.")
+        if monthly_premium_auto <= 0:
+            errors.append("Monthly Premium Auto must be > 0.")
+        if total_claim_amount < 0:
+            errors.append("Total Claim Amount cannot be negative.")
+
+        if errors:
+            for e in errors:
+                st.error(f"❌ {e}")
+        else:
+            try:
+                processed = preprocess_input(
+                    number_of_policies=int(number_of_policies),
+                    monthly_premium_auto=float(monthly_premium_auto),
+                    total_claim_amount=float(total_claim_amount),
+                    vehicle_class=vehicle_class,
+                    coverage=coverage,
+                    artifact=artifact,
+                )
+                clv, segment = predict_clv(processed, artifact)
+                meta = SEGMENT_META[segment]
+
+                # CLV card
+                st.markdown(
+                    f"""
+                    <div class="result-card clv-card">
+                        <p class="clv-label">Predicted Customer Lifetime Value</p>
+                        <p class="clv-value">${clv:,.0f}</p>
+                        <p class="clv-note">Estimated total revenue from this customer</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # Segment card
+                st.markdown(
+                    f"""
+                    <div class="result-card segment-card {meta['css']}">
+                        <p class="seg-label">Customer Segment</p>
+                        <p class="seg-name">{meta['icon']} {segment}</p>
+                        <p class="seg-desc">{meta['range']} &nbsp;|&nbsp; {meta['desc']}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # Segment legend
+                st.markdown("---")
+                st.markdown(
+                    """
+                    <p style="font-size:0.72rem;color:#5A6475;letter-spacing:0.12em;
+                       text-transform:uppercase;margin-bottom:0.6rem;">Segment Thresholds</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                legend_items = [
+                    ("🥉", "Bronze",   "< $5K",         "#E8A060"),
+                    ("🥈", "Silver",   "$5K – $10K",    "#C8D0DC"),
+                    ("🥇", "Gold",     "$10K – $20K",   "#FFE566"),
+                    ("🏆", "Platinum", "> $20K",         "#E8E8FF"),
+                ]
+                for icon, name, rng, color in legend_items:
+                    active = "font-weight:700;" if name == segment else "opacity:0.45;"
+                    st.markdown(
+                        f"""
+                        <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:0.3rem 0;{active}">
+                            <span style="color:{color};font-size:0.88rem;">{icon} {name}</span>
+                            <span style="color:#8892A4;font-size:0.82rem;
+                                font-family:'DM Mono',monospace;">{rng}</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+            except Exception as exc:
+                st.error(f"❌ Prediction failed: {exc}")
+    else:
+        # Placeholder state
+        st.markdown(
+            """
+            <div style="text-align:center; padding: 3rem 1rem; color:#3A4455;">
+                <div style="font-size:3.5rem; margin-bottom:1rem;">📡</div>
+                <p style="font-size:1rem; font-weight:500; color:#4A5568;">
+                    Awaiting prediction
+                </p>
+                <p style="font-size:0.82rem; color:#3A4455; margin-top:0.4rem;">
+                    Fill in the customer features on the left<br>
+                    and click <strong style="color:#4A5568;">Predict CLV &amp; Segment</strong>.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ─── Footer ───────────────────────────────────────────────────────────────────
+st.markdown(
+    """
+    <hr>
+    <p style="text-align:center;font-size:0.75rem;color:#2D3748;margin-top:0.5rem;">
+        Gradient Boosting · 5 features · R² ≈ 0.90 · Log-scale target
+        &nbsp;|&nbsp; Built with Streamlit
+    </p>
+    """,
+    unsafe_allow_html=True,
+)
