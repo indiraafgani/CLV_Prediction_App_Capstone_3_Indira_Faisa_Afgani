@@ -258,7 +258,7 @@ st.markdown(
     }
     .clv-note {
         font-size: 0.76rem;
-        color: #3a4a5a;
+        color: #7aaac8;
         margin-top: 0.5rem;
     }
 
@@ -490,7 +490,7 @@ with col_result:
                 st.markdown("---")
                 st.markdown(
                     """<p style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;
-                       color:#3a2a10;letter-spacing:0.15em;margin-bottom:0.6rem;">
+                       color:#F0A533;letter-spacing:0.15em;margin-bottom:0.6rem;">
                        Segment Thresholds</p>""",
                     unsafe_allow_html=True,
                 )
@@ -505,7 +505,7 @@ with col_result:
                         f"""<div style="display:flex;justify-content:space-between;
                             align-items:center;padding:0.3rem 0;{active}">
                             <span style="color:{color};font-size:0.88rem;">{icon} {name}</span>
-                            <span style="color:#6a5030;font-size:0.82rem;
+                            <span style="color:#c8a870;font-size:0.82rem;
                                 font-family:'DM Mono',monospace;">{rng}</span>
                         </div>""",
                         unsafe_allow_html=True,
@@ -518,13 +518,13 @@ with col_result:
             """
             <div style="text-align:center; padding: 3rem 1rem;">
                 <div style="font-size:3.5rem; margin-bottom:1rem;">🔥</div>
-                <p style="font-size:1.1rem; font-weight:600; color:#3a2510;
-                   font-family:'Bebas Neue',sans-serif; letter-spacing:0.12em;">
-                    Awaiting Prediction
+                <p style="font-size:1.15rem; font-weight:700; color:#F0A533;
+                   font-family:'Bebas Neue',sans-serif; letter-spacing:0.15em;">
+                    AWAITING PREDICTION
                 </p>
-                <p style="font-size:0.82rem; color:#2a1a08; margin-top:0.4rem;">
+                <p style="font-size:0.88rem; color:#c8a870; margin-top:0.5rem; line-height:1.6;">
                     Fill in the customer details on the left<br>
-                    and click <strong style="color:#3a2510;">🔥 Predict CLV &amp; Segment</strong>
+                    and click <strong style="color:#E44F0A;">🔥 Predict CLV &amp; Segment</strong>
                 </p>
             </div>
             """,
@@ -537,7 +537,7 @@ with col_result:
 st.markdown(
     """
     <hr>
-    <p style="text-align:center;font-size:0.75rem;color:#2a1a08;margin-top:0.5rem;">
+    <p style="text-align:center;font-size:0.75rem;color:#8a7050;margin-top:0.5rem;">
         Gradient Boosting · 5 features · R² ≈ 0.90 · Log-scale target
         &nbsp;|&nbsp; Built with Streamlit
     </p>
