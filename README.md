@@ -1,6 +1,6 @@
 # 🚗 Customer Lifetime Value Prediction
 ### Enabling Data-Driven Marketing Strategies for AutoShield Insurance Co.
-By: Indira Faisa Afgani
+
 ---
 
 ## 📋 Project Overview
@@ -8,7 +8,7 @@ By: Indira Faisa Afgani
 This project builds a **supervised regression model** to predict Customer Lifetime Value (CLV) for AutoShield Insurance Co., a motor vehicle insurance company. By accurately predicting CLV, the company can move from intuition-based to data-driven marketing and retention strategies.
 
 **Author:** Indira Faisa Afgani  
-**Type:** Capstone Project — Machine Learning (Regression)
+**Type:** Capstone Project 3 — Machine Learning (Regression)
 
 ---
 
