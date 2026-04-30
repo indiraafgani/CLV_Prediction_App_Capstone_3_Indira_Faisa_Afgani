@@ -88,7 +88,7 @@ st.markdown("""
 
     /* Background gradient */
     .stApp {
-        background: linear-gradient(160deg, #e1e1e1 0%, #c8d8ee 45%, #a8c4e8 100%);
+        background: linear-gradient(160deg, #8fa8c8 0%, #6b8db5 40%, #4a6f9e 100%);
         min-height: 100vh;
     }
 
@@ -147,16 +147,19 @@ st.markdown("""
 
     .hero-subtitle {
         font-size: 1.15rem;
-        font-weight: 500;
-        color: rgba(255,255,255,0.88);
+        font-weight: 600;
+        color: #ffffff;
         margin: 0.5rem 0 0 0;
         letter-spacing: 0.3px;
+        text-shadow: 0 1px 8px rgba(0,0,0,0.3);
     }
 
     .hero-desc {
         font-size: 0.88rem;
-        color: rgba(255,255,255,0.62);
+        color: rgba(255,255,255,0.88);
         margin: 0.5rem 0 0 0;
+        font-weight: 500;
+        text-shadow: 0 1px 6px rgba(0,0,0,0.2);
     }
 
     .hero-badge {
