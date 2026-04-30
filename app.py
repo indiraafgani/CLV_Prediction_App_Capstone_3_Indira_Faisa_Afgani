@@ -1,546 +1,343 @@
-"""
-app.py – Customer Lifetime Value Prediction App
-Run: streamlit run app.py
-"""
-
 import streamlit as st
+import pandas as pd
+import numpy as np
 import joblib
 import os
-import numpy as np
-import pandas as pd
-from preprocessing import preprocess_input, predict_clv
 
-
-# ─── Auto-train if model.pkl not found ───────────────────────────────────────
-def train_and_save_model(data_path: str = "data_customer_lifetime_value.csv",
-                          model_path: str = "model.pkl"):
-    from sklearn.preprocessing import OrdinalEncoder, RobustScaler
-    from sklearn.model_selection import train_test_split
-    from sklearn.ensemble import GradientBoostingRegressor
-
-    df = pd.read_csv(data_path)
-    df_clean = df.drop_duplicates().reset_index(drop=True)
-    df_clean["Number of Policies"] = df_clean["Number of Policies"].astype(int)
-    df_clean["CLV_log"] = np.log(df_clean["Customer Lifetime Value"])
-
-    coverage_order  = ["Basic", "Extended", "Premium"]
-    vehicle_order   = ["Two-Door Car", "Four-Door Car", "SUV",
-                       "Sports Car", "Luxury Car", "Luxury SUV"]
-    education_order = ["High School or Below", "College",
-                       "Bachelor", "Master", "Doctor"]
-
-    ordinal_enc = OrdinalEncoder(
-        categories=[coverage_order, vehicle_order, education_order]
-    )
-    df_clean[["Coverage_enc", "VehicleClass_enc", "Education_enc"]] = \
-        ordinal_enc.fit_transform(
-            df_clean[["Coverage", "Vehicle Class", "Education"]]
-        )
-
-    df_clean = pd.get_dummies(
-        df_clean,
-        columns=["Renew Offer Type", "EmploymentStatus", "Marital Status"],
-        drop_first=True,
-        dtype=int,
-    )
-
-    cols_to_drop = ["Customer Lifetime Value", "Coverage", "Vehicle Class",
-                    "Education", "CLV_log"]
-    X = df_clean.drop(cols_to_drop, axis=1)
-    y = df_clean["CLV_log"]
-
-    X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    numerical_cols = ["Monthly Premium Auto", "Total Claim Amount",
-                      "Number of Policies", "Income"]
-    bounds = {}
-    for col in numerical_cols:
-        Q1  = X_train[col].quantile(0.25)
-        Q3  = X_train[col].quantile(0.75)
-        IQR = Q3 - Q1
-        bounds[col] = (Q1 - 1.5 * IQR, Q3 + 1.5 * IQR)
-
-    X_train_capped = X_train.copy()
-    for col in numerical_cols:
-        lo, hi = bounds[col]
-        X_train_capped[col] = X_train[col].clip(lower=lo, upper=hi)
-
-    scaler = RobustScaler()
-    X_train_capped[numerical_cols] = scaler.fit_transform(
-        X_train_capped[numerical_cols]
-    )
-
-    selected_features = [
-        "Number of Policies",
-        "Monthly Premium Auto",
-        "VehicleClass_enc",
-        "Coverage_enc",
-        "Total Claim Amount",
-    ]
-    X_train_selected = X_train_capped[selected_features]
-
-    model = GradientBoostingRegressor(n_estimators=100, random_state=42)
-    model.fit(X_train_selected, y_train)
-
-    artifact = {
-        "model":             model,
-        "ordinal_enc":       ordinal_enc,
-        "scaler":            scaler,
-        "bounds":            bounds,
-        "selected_features": selected_features,
-        "numerical_cols":    numerical_cols,
-        "coverage_order":    coverage_order,
-        "vehicle_order":     vehicle_order,
-    }
-    joblib.dump(artifact, model_path)
-    return artifact
-
-
-# ─── Page config ─────────────────────────────────────────────────────────────
+# =============================================
+# PAGE CONFIG
+# =============================================
 st.set_page_config(
-    page_title="CLV Predictor",
-    page_icon="🔥",
-    layout="wide",
-    initial_sidebar_state="collapsed",
+    page_title="CLV Predictor — AutoShield Insurance",
+    page_icon="🛡️",
+    layout="centered"
 )
 
-# ─── FEVER Color Palette CSS ─────────────────────────────────────────────────
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+# =============================================
+# LOAD MODEL
+# =============================================
+@st.cache_resource
+def load_model():
+    model_path = "clv_gradient_boosting_model.joblib"
+    if os.path.exists(model_path):
+        return joblib.load(model_path)
+    return None
 
-    html, body, [class*="css"] {
-        font-family: 'DM Sans', sans-serif;
-        color: #FCF5AF;
-    }
-    .stApp {
-        background: #060608;
-    }
-    #MainMenu, footer, header { visibility: hidden; }
+model = load_model()
 
-    .hero {
-        background: linear-gradient(135deg, #0a0a0f 0%, #0B1A2E 60%, #1a0a00 100%);
-        border: 1px solid rgba(228,79,10,0.3);
-        border-radius: 20px;
-        padding: 2.5rem 3rem;
-        margin-bottom: 2rem;
-        position: relative;
-        overflow: hidden;
-    }
-    .hero::before {
-        content: '';
-        position: absolute;
-        top: -80px; right: -80px;
-        width: 280px; height: 280px;
-        background: radial-gradient(circle, rgba(228,79,10,0.18) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-    .hero::after {
-        content: '';
-        position: absolute;
-        bottom: -60px; left: -60px;
-        width: 200px; height: 200px;
-        background: radial-gradient(circle, rgba(11,75,139,0.2) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-    .hero-title {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 3rem;
-        letter-spacing: 0.08em;
-        background: linear-gradient(90deg, #F0A533, #E44F0A, #BA011A);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0 0 0.4rem 0;
-        line-height: 1;
-    }
-    .hero-sub {
-        font-size: 0.95rem;
-        color: #a89060;
-        margin: 0;
-        font-weight: 400;
-    }
+# =============================================
+# HELPER FUNCTIONS
+# =============================================
+def predict_clv(input_data: dict) -> float:
+    df_input = pd.DataFrame([input_data])
+    log_clv  = model.predict(df_input)[0]
+    return np.exp(log_clv)
 
-    .section-card {
-        background: #0D0D12;
-        border: 1px solid rgba(228,79,10,0.15);
-        border-radius: 16px;
-        padding: 1.8rem 2rem;
-        margin-bottom: 1.5rem;
-    }
-    .section-title {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 1rem;
-        letter-spacing: 0.2em;
-        color: #F0A533;
-        margin-bottom: 1.2rem;
-    }
+def get_segment(clv: float) -> dict:
+    if clv < 5000:
+        return {
+            "name"  : "🥉 Bronze",
+            "range" : "< $5,000",
+            "color" : "#CD7F32",
+            "bg"    : "#FFF5E6",
+            "action": "Educate & nurture. Focus on upselling to additional policies.",
+            "cac"   : f"${clv * 0.20:,.0f}"
+        }
+    elif clv < 10000:
+        return {
+            "name"  : "🥈 Silver",
+            "range" : "$5,000 – $10,000",
+            "color" : "#808080",
+            "bg"    : "#F5F5F5",
+            "action": "Cross-sell higher coverage tiers. Moderate retention budget.",
+            "cac"   : f"${clv * 0.20:,.0f}"
+        }
+    elif clv < 20000:
+        return {
+            "name"  : "🥇 Gold",
+            "range" : "$10,000 – $20,000",
+            "color" : "#B8860B",
+            "bg"    : "#FFFDE7",
+            "action": "Priority retention. Offer loyalty rewards and dedicated support.",
+            "cac"   : f"${clv * 0.20:,.0f}"
+        }
+    else:
+        return {
+            "name"  : "💎 Platinum",
+            "range" : "> $20,000",
+            "color" : "#4A4A8A",
+            "bg"    : "#EDE7F6",
+            "action": "White-glove service. Zero churn tolerance. VIP treatment.",
+            "cac"   : f"${clv * 0.20:,.0f}"
+        }
 
-    label, .stSelectbox label, .stNumberInput label,
-    .stTextInput label, [data-testid="stWidgetLabel"] {
-        color: #c8a870 !important;
-        font-size: 0.87rem !important;
-        font-weight: 500 !important;
+# =============================================
+# CUSTOM CSS
+# =============================================
+st.markdown("""
+<style>
+    .main-header {
+        text-align: center;
+        padding: 1rem 0;
     }
-    .stSelectbox > div > div,
-    .stNumberInput > div > div > input,
-    .stTextInput > div > div > input {
-        background: #13100a !important;
-        border: 1px solid rgba(240,165,51,0.25) !important;
-        border-radius: 10px !important;
-        color: #FCF5AF !important;
-        font-family: 'DM Sans', sans-serif !important;
+    .result-card {
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 1rem 0;
+        border: 2px solid;
     }
-    .stSelectbox > div > div:focus-within,
-    .stNumberInput > div > div > input:focus,
-    .stTextInput > div > div > input:focus {
-        border-color: #E44F0A !important;
-        box-shadow: 0 0 0 2px rgba(228,79,10,0.2) !important;
+    .metric-row {
+        display: flex;
+        justify-content: space-around;
+        margin: 1rem 0;
     }
-    [data-baseweb="select"] ul li {
-        background: #13100a !important;
-        color: #FCF5AF !important;
+    .metric-box {
+        text-align: center;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        flex: 1;
+        margin: 0 0.5rem;
     }
-    [data-baseweb="popover"] { background: #13100a !important; }
-
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #1f3a5f;
+    }
+    .metric-label {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    .info-box {
+        background: #EBF5FB;
+        border-left: 4px solid #2E86C1;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 0.5rem 0;
+    }
     .stButton > button {
         width: 100%;
-        background: linear-gradient(135deg, #BA011A, #E44F0A);
-        color: #FCF5AF;
-        border: none;
-        border-radius: 12px;
-        padding: 0.85rem 2rem;
+        padding: 0.75rem;
         font-size: 1.1rem;
-        font-weight: 700;
-        font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 0.12em;
-        cursor: pointer;
-        transition: all 0.25s ease;
-        margin-top: 0.5rem;
+        font-weight: bold;
+        border-radius: 8px;
     }
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #E44F0A, #F0A533);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 28px rgba(228,79,10,0.35);
-        color: #000000;
-    }
-    .stButton > button:active { transform: translateY(0); }
+</style>
+""", unsafe_allow_html=True)
 
-    .result-card {
-        border-radius: 16px;
-        padding: 2rem;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .clv-card {
-        background: linear-gradient(135deg, #0B1A2E, #0e2040);
-        border: 1px solid rgba(11,75,139,0.5);
-    }
-    .clv-label {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 0.9rem;
-        letter-spacing: 0.2em;
-        color: #5B9BD5;
-        margin-bottom: 0.4rem;
-    }
-    .clv-customer {
-        font-size: 0.88rem;
-        color: #F0A533;
-        margin-bottom: 0.4rem;
-        font-weight: 600;
-    }
-    .clv-value {
-        font-size: 3rem;
-        font-weight: 700;
-        font-family: 'DM Mono', monospace;
-        color: #FCF5AF;
-        line-height: 1;
-    }
-    .clv-note {
-        font-size: 0.76rem;
-        color: #7aaac8;
-        margin-top: 0.5rem;
-    }
+# =============================================
+# HEADER
+# =============================================
+st.markdown("""
+<div class='main-header'>
+    <h1>🛡️ AutoShield Insurance</h1>
+    <h3>Customer Lifetime Value Predictor</h3>
+    <p style='color: #666;'>Predict CLV and assign the right customer segment instantly</p>
+</div>
+""", unsafe_allow_html=True)
 
-    .segment-card { border-radius: 16px; padding: 1.8rem; text-align: center; }
-    .seg-label {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 0.9rem;
-        letter-spacing: 0.2em;
-        margin-bottom: 0.5rem;
-    }
-    .seg-name {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 2.5rem;
-        letter-spacing: 0.1em;
-        line-height: 1;
-    }
-    .seg-desc { font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.75; }
+st.divider()
 
-    .seg-platinum {
-        background: linear-gradient(135deg, #0B1A2E, #122040);
-        border: 1px solid rgba(91,155,213,0.4);
-    }
-    .seg-platinum .seg-label { color: #5B9BD5; }
-    .seg-platinum .seg-name  { color: #FCF5AF; }
-
-    .seg-gold {
-        background: linear-gradient(135deg, #1a1000, #271800);
-        border: 1px solid rgba(240,165,51,0.4);
-    }
-    .seg-gold .seg-label { color: #F0A533; }
-    .seg-gold .seg-name  { color: #FCF5AF; }
-
-    .seg-silver {
-        background: linear-gradient(135deg, #080e18, #0e1a28);
-        border: 1px solid rgba(91,155,213,0.25);
-    }
-    .seg-silver .seg-label { color: #7aaac8; }
-    .seg-silver .seg-name  { color: #c8dce8; }
-
-    .seg-bronze {
-        background: linear-gradient(135deg, #1a0500, #220800);
-        border: 1px solid rgba(228,79,10,0.35);
-    }
-    .seg-bronze .seg-label { color: #E44F0A; }
-    .seg-bronze .seg-name  { color: #F0A533; }
-
-    .info-pill {
-        display: inline-block;
-        background: rgba(228,79,10,0.08);
-        border: 1px solid rgba(228,79,10,0.2);
-        border-radius: 999px;
-        padding: 0.25rem 0.85rem;
-        font-size: 0.78rem;
-        color: #E44F0A;
-        margin: 0.25rem 0.2rem;
-    }
-    hr { border-color: rgba(228,79,10,0.1); }
-    .stAlert { border-radius: 12px; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# ─── Load model ───────────────────────────────────────────────────────────────
-@st.cache_resource(show_spinner=False)
-def load_artifact():
-    model_path = "model.pkl"
-    data_path  = "data_customer_lifetime_value.csv"
-    if os.path.exists(model_path):
-        return joblib.load(model_path), None
-    if not os.path.exists(data_path):
-        return None, f"Dataset `{data_path}` tidak ditemukan di server."
-    return train_and_save_model(data_path, model_path), None
-
-
-# ─── Hero ────────────────────────────────────────────────────────────────────
-st.markdown(
-    """
-    <div class="hero">
-        <p class="hero-title">🔥 Customer Lifetime Value Predictor</p>
-        <p class="hero-sub">
-            Enter customer details below to predict their estimated lifetime value
-            and automatically classify them into a revenue segment.
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-with st.spinner("⚙️ Setting up model for the first time, please wait..."):
-    artifact, error_msg = load_artifact()
-
-if artifact is None:
-    st.error(f"❌ {error_msg}", icon="🚨")
+# =============================================
+# MODEL CHECK
+# =============================================
+if model is None:
+    st.error("⚠️ Model file not found. Please ensure `clv_gradient_boosting_model.joblib` is in the same directory.")
+    st.info("💡 Run the notebook to generate the model file first.")
     st.stop()
 
-VEHICLE_OPTIONS  = artifact["vehicle_order"]
-COVERAGE_OPTIONS = artifact["coverage_order"]
+# =============================================
+# INPUT FORM
+# =============================================
+st.subheader("📋 Customer Information")
+st.caption("Fill in the customer details below to predict their CLV.")
 
-# ─── Layout ──────────────────────────────────────────────────────────────────
-col_input, col_result = st.columns([1.1, 0.9], gap="large")
+with st.form("clv_form"):
 
-with col_input:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">📋 Customer Information</p>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
 
-    customer_name = st.text_input(
-        "Customer Name",
-        placeholder="e.g. John Doe",
-        help="Name of the customer being evaluated.",
-    )
-
-    r1a, r1b = st.columns(2)
-    with r1a:
-        number_of_policies = st.number_input(
-            "Number of Policies",
-            min_value=1, max_value=9, value=2, step=1,
-            help="Total insurance policies held (1–9).",
-        )
-    with r1b:
-        monthly_premium_auto = st.number_input(
-            "Monthly Premium Auto ($)",
-            min_value=61.0, max_value=298.0, value=100.0,
-            step=1.0, format="%.2f",
-            help="Monthly auto insurance premium in USD.",
-        )
-
-    r2a, r2b = st.columns(2)
-    with r2a:
+    with col1:
+        st.markdown("**🚗 Vehicle & Coverage**")
         vehicle_class = st.selectbox(
-            "Vehicle Class", options=VEHICLE_OPTIONS, index=1,
-            help="Type of vehicle insured.",
+            "Vehicle Class",
+            ["Two-Door Car", "Four-Door Car", "SUV",
+             "Sports Car", "Luxury Car", "Luxury SUV"],
+            help="Type of vehicle owned by the customer"
         )
-    with r2b:
         coverage = st.selectbox(
-            "Coverage Level", options=COVERAGE_OPTIONS, index=0,
-            help="Insurance coverage tier.",
+            "Coverage Type",
+            ["Basic", "Extended", "Premium"],
+            help="Insurance coverage level selected by the customer"
+        )
+        renew_offer = st.selectbox(
+            "Renew Offer Type",
+            ["Offer1", "Offer2", "Offer3", "Offer4"],
+            help="Type of renewal offer given to the customer"
         )
 
-    total_claim_amount = st.number_input(
-        "Total Claim Amount ($)",
-        min_value=0.0, max_value=2894.0, value=400.0,
-        step=1.0, format="%.2f",
-        help="Total dollar amount of claims filed.",
+    with col2:
+        st.markdown("**👤 Customer Profile**")
+        employment = st.selectbox(
+            "Employment Status",
+            ["Employed", "Unemployed", "Medical Leave",
+             "Disabled", "Retired"],
+            help="Current employment status"
+        )
+        marital = st.selectbox(
+            "Marital Status",
+            ["Married", "Single", "Divorced"],
+            help="Customer's marital status"
+        )
+        education = st.selectbox(
+            "Education Level",
+            ["High School or Below", "College",
+             "Bachelor", "Master", "Doctor"],
+            help="Highest education level attained"
+        )
+
+    st.markdown("**💰 Financial Information**")
+    col3, col4 = st.columns(2)
+
+    with col3:
+        num_policies = st.slider(
+            "Number of Policies",
+            min_value=1, max_value=9, value=2,
+            help="Total number of insurance policies held"
+        )
+        monthly_premium = st.number_input(
+            "Monthly Premium Auto ($)",
+            min_value=61, max_value=300, value=90,
+            help="Monthly premium amount paid (between $61–$300)"
+        )
+
+    with col4:
+        total_claim = st.number_input(
+            "Total Claim Amount ($)",
+            min_value=0.0, max_value=3000.0, value=400.0,
+            step=10.0,
+            help="Total claim amount submitted so far"
+        )
+        income = st.number_input(
+            "Annual Income ($)",
+            min_value=0, max_value=100000, value=35000,
+            step=1000,
+            help="Annual income (0 for unemployed customers)"
+        )
+
+    submitted = st.form_submit_button(
+        "🔍 Predict CLV",
+        use_container_width=True
     )
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(
-        """
-        <div style="margin-top:-0.5rem; margin-bottom:1rem;">
-            <span class="info-pill">🧠 Gradient Boosting</span>
-            <span class="info-pill">📐 RobustScaler</span>
-            <span class="info-pill">🔢 Log-Target</span>
-            <span class="info-pill">✂️ IQR Capping</span>
-            <span class="info-pill">R² ≈ 0.90</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    predict_clicked = st.button("🔥 Predict CLV & Segment", use_container_width=True)
-
-
-# ─── Results ─────────────────────────────────────────────────────────────────
-with col_result:
-    st.markdown('<div class="section-card" style="height:100%">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">📊 Prediction Result</p>', unsafe_allow_html=True)
-
-    SEGMENT_META = {
-        "Platinum": {"css": "seg-platinum", "icon": "🏆", "range": "> $20,000",       "desc": "Top-tier, highest-value customer",        "color": "#5B9BD5"},
-        "Gold":     {"css": "seg-gold",     "icon": "🥇", "range": "$10,000–$20,000", "desc": "High-value, strong retention priority",   "color": "#F0A533"},
-        "Silver":   {"css": "seg-silver",   "icon": "🥈", "range": "$5,000–$10,000",  "desc": "Mid-tier, growth opportunity",            "color": "#7aaac8"},
-        "Bronze":   {"css": "seg-bronze",   "icon": "🥉", "range": "< $5,000",        "desc": "Entry-level, cost-conscious segment",     "color": "#E44F0A"},
+# =============================================
+# PREDICTION
+# =============================================
+if submitted:
+    input_data = {
+        "Vehicle Class"       : vehicle_class,
+        "Coverage"            : coverage,
+        "Renew Offer Type"    : renew_offer,
+        "EmploymentStatus"    : employment,
+        "Marital Status"      : marital,
+        "Education"           : education,
+        "Number of Policies"  : num_policies,
+        "Monthly Premium Auto": monthly_premium,
+        "Total Claim Amount"  : total_claim,
+        "Income"              : income
     }
 
-    if predict_clicked:
-        errors = []
-        if not customer_name.strip():
-            errors.append("Customer Name tidak boleh kosong.")
-        if number_of_policies < 1:
-            errors.append("Number of Policies must be ≥ 1.")
-        if monthly_premium_auto <= 0:
-            errors.append("Monthly Premium Auto must be > 0.")
-        if total_claim_amount < 0:
-            errors.append("Total Claim Amount cannot be negative.")
+    with st.spinner("Calculating CLV..."):
+        clv       = predict_clv(input_data)
+        segment   = get_segment(clv)
 
-        if errors:
-            for e in errors:
-                st.error(f"❌ {e}")
-        else:
-            try:
-                processed = preprocess_input(
-                    number_of_policies=int(number_of_policies),
-                    monthly_premium_auto=float(monthly_premium_auto),
-                    total_claim_amount=float(total_claim_amount),
-                    vehicle_class=vehicle_class,
-                    coverage=coverage,
-                    artifact=artifact,
-                )
-                clv, segment = predict_clv(processed, artifact)
-                meta = SEGMENT_META[segment]
-                name_display = customer_name.strip().title()
+    st.divider()
+    st.subheader("📊 Prediction Results")
 
-                st.markdown(
-                    f"""
-                    <div class="result-card clv-card">
-                        <p class="clv-label">Predicted Customer Lifetime Value</p>
-                        <p class="clv-customer">👤 {name_display}</p>
-                        <p class="clv-value">${clv:,.0f}</p>
-                        <p class="clv-note">Estimated total revenue from this customer</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    # --- CLV Result ---
+    st.markdown(f"""
+    <div class='result-card' style='border-color:{segment["color"]}; background:{segment["bg"]};'>
+        <h2 style='text-align:center; color:{segment["color"]}; margin-bottom:0.5rem;'>
+            {segment["name"]} Customer
+        </h2>
+        <h1 style='text-align:center; color:#1f3a5f; font-size:3rem; margin:0;'>
+            ${clv:,.2f}
+        </h1>
+        <p style='text-align:center; color:#666; margin-top:0.25rem;'>
+            Predicted Customer Lifetime Value
+        </p>
+        <p style='text-align:center; color:{segment["color"]}; font-weight:bold;'>
+            Segment Range: {segment["range"]}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-                st.markdown(
-                    f"""
-                    <div class="result-card segment-card {meta['css']}">
-                        <p class="seg-label">Customer Segment</p>
-                        <p class="seg-name">{meta['icon']} {segment}</p>
-                        <p class="seg-desc">{meta['range']} &nbsp;|&nbsp; {meta['desc']}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    # --- Key Metrics ---
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.metric("📦 Segment", segment["name"].split(" ", 1)[1])
+    with col_b:
+        st.metric("💵 Predicted CLV", f"${clv:,.0f}")
+    with col_c:
+        st.metric("🎯 Max Recommended CAC", segment["cac"])
 
-                st.markdown("---")
-                st.markdown(
-                    """<p style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;
-                       color:#F0A533;letter-spacing:0.15em;margin-bottom:0.6rem;">
-                       Segment Thresholds</p>""",
-                    unsafe_allow_html=True,
-                )
-                for icon, name, rng, color in [
-                    ("🥉", "Bronze",   "< $5K",      "#E44F0A"),
-                    ("🥈", "Silver",   "$5K–$10K",   "#7aaac8"),
-                    ("🥇", "Gold",     "$10K–$20K",  "#F0A533"),
-                    ("🏆", "Platinum", "> $20K",      "#5B9BD5"),
-                ]:
-                    active = "font-weight:700;" if name == segment else "opacity:0.35;"
-                    st.markdown(
-                        f"""<div style="display:flex;justify-content:space-between;
-                            align-items:center;padding:0.3rem 0;{active}">
-                            <span style="color:{color};font-size:0.88rem;">{icon} {name}</span>
-                            <span style="color:#c8a870;font-size:0.82rem;
-                                font-family:'DM Mono',monospace;">{rng}</span>
-                        </div>""",
-                        unsafe_allow_html=True,
-                    )
+    # --- Action Recommendation ---
+    st.markdown("**📌 Recommended Action**")
+    st.info(f"**{segment['name']}** → {segment['action']}")
 
-            except Exception as exc:
-                st.error(f"❌ Prediction failed: {exc}")
-    else:
-        st.markdown(
-            """
-            <div style="text-align:center; padding: 3rem 1rem;">
-                <div style="font-size:3.5rem; margin-bottom:1rem;">🔥</div>
-                <p style="font-size:1.15rem; font-weight:700; color:#F0A533;
-                   font-family:'Bebas Neue',sans-serif; letter-spacing:0.15em;">
-                    AWAITING PREDICTION
-                </p>
-                <p style="font-size:0.88rem; color:#c8a870; margin-top:0.5rem; line-height:1.6;">
-                    Fill in the customer details on the left<br>
-                    and click <strong style="color:#E44F0A;">🔥 Predict CLV &amp; Segment</strong>
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    # --- Input Summary ---
+    with st.expander("📋 View Input Summary"):
+        summary_df = pd.DataFrame({
+            "Feature": list(input_data.keys()),
+            "Value"  : [str(v) for v in input_data.values()]
+        })
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    # --- Segment Guide ---
+    st.divider()
+    st.subheader("📖 Segment Reference Guide")
 
-# ─── Footer ───────────────────────────────────────────────────────────────────
-st.markdown(
-    """
-    <hr>
-    <p style="text-align:center;font-size:0.75rem;color:#8a7050;margin-top:0.5rem;">
-        Gradient Boosting · 5 features · R² ≈ 0.90 · Log-scale target
-        &nbsp;|&nbsp; Built with Streamlit
-    </p>
-    """,
-    unsafe_allow_html=True,
-)
+    seg_col1, seg_col2, seg_col3, seg_col4 = st.columns(4)
+
+    with seg_col1:
+        st.markdown("""
+        **🥉 Bronze**
+        - CLV < $5,000
+        - 37.3% of customers
+        - 16.7% of total CLV
+        - Strategy: Nurture & Educate
+        """)
+    with seg_col2:
+        st.markdown("""
+        **🥈 Silver**
+        - CLV $5K – $10K
+        - 38.1% of customers
+        - 35.9% of total CLV
+        - Strategy: Cross-sell
+        """)
+    with seg_col3:
+        st.markdown("""
+        **🥇 Gold**
+        - CLV $10K – $20K
+        - 22.9% of customers
+        - 42.1% of total CLV
+        - Strategy: Retain & Reward
+        """)
+    with seg_col4:
+        st.markdown("""
+        **💎 Platinum**
+        - CLV > $20K
+        - 1.7% of customers
+        - 5.4% of total CLV
+        - Strategy: VIP Service
+        """)
+
+# =============================================
+# FOOTER
+# =============================================
+st.divider()
+st.markdown("""
+<p style='text-align:center; color:#999; font-size:0.8rem;'>
+    Powered by Gradient Boosting Regressor · R² = 0.9060 · MAPE = 9.89% ·
+    AutoShield Insurance Co. © 2024
+</p>
+""", unsafe_allow_html=True)
